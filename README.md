@@ -30,7 +30,9 @@ Saved data from MMT 0.1.x is converted automatically.
   to copy it). When a switch needs a UI reload, a "Reload UI" bar appears at the bottom.
 - Modules so far: **Item Bar** (`MMT_ItemBar`), **Item Compare** (`MMT_ItemCompare`), **Loot
   Distribution** (`MMT_LootDistribution`), **Quest Tracker** (`MMT_QuestTracker`), **Statistics**
-  (`MMT_Statistics`).
+  (`MMT_Statistics`), **Team Launch**
+  (`MMT_TeamLaunch`: named team presets, restore the last team, invite-team key and button, add
+  characters by name; `/mmtteam`).
 - Lists that scroll (the page list, module and team lists) show a small arrow at the top or
   bottom edge while there is more above or below; clicking it scrolls.
 - Settings sync for modules: add `sync = true` to `MMT.NewModule{...}` and the module gets

@@ -1,0 +1,5 @@
+<Bindings>
+    <Binding name="MMT_TEAMLAUNCH_INVITE" header="MMT_TEAMLAUNCH" category="BINDING_CATEGORY_MMT">
+        MMT_TeamLaunchInvite()
+    </Binding>
+</Bindings>

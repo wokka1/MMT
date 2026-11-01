@@ -1,0 +1,12 @@
+## Interface: 16001
+## Title: MMT - Team Launch
+## Notes: MMT module: named team presets, restore the last team, and one key or button to invite the whole team.
+## Version: 1.0.0
+## Author: wokka1
+## X-Repository: https://github.com/wokka1/MMT
+## Dependencies: MMT
+## X-MMT-Module: 1
+## X-MMT-Title: Team Launch
+## IconTexture: Interface\Icons\INV_Misc_GroupNeedMore
+
+Module.lua
