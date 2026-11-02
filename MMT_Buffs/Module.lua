@@ -155,6 +155,9 @@ local function ApplyKeys()
     if not M.enabled or not M.db then return end
     if M.db.keyTarget ~= "" then SetOverrideBindingClick(owner, true, M.db.keyTarget, "MMTBuffTarget") end
     if M.db.keyGroup ~= "" then SetOverrideBindingClick(owner, true, M.db.keyGroup, "MMTBuffGroup") end
+    -- ISBoxer can only send these as the numpad scancodes (Num 0 / Num 9), which the game sees as NUMPAD keys
+    if M.db.keyTarget == "ALT-INSERT" then SetOverrideBindingClick(owner, true, "ALT-NUMPAD0", "MMTBuffTarget") end
+    if M.db.keyGroup == "ALT-PAGEUP" then SetOverrideBindingClick(owner, true, "ALT-NUMPAD9", "MMTBuffGroup") end
 end
 owner:RegisterEvent("PLAYER_LOGIN")
 owner:RegisterEvent("PLAYER_REGEN_ENABLED")
