@@ -182,6 +182,17 @@ SlashCmdList.MMTBUFF = function(msg)
     elseif cmd == "reset" then
         M.db.buffs[ClassToken()] = nil
         MMT.Print("Buff list: %s", #M.List() > 0 and table.concat(M.List(), ", ") or "(empty)")
+    elseif cmd == "why" then
+        for _, spell in ipairs(M.List()) do
+            MMT.Print("%s: known=%s", spell, tostring(Known(spell)))
+            for _, unit in ipairs(GroupUnits()) do
+                if UnitExists(unit) then
+                    MMT.Print("  %s: friend=%s player=%s dead=%s buffed=%s inRange=%s", UnitName(unit),
+                        tostring(UnitIsFriend("player", unit)), tostring(UnitIsPlayer(unit)),
+                        tostring(UnitIsDeadOrGhost(unit)), tostring(HasBuff(unit, spell)), tostring(InRange(spell, unit)))
+                end
+            end
+        end
     elseif cmd == "test" then
         local s, u = M.NextTarget()
         MMT.Print("Target key would cast: %s", s and (s .. " on " .. UnitName(u)) or "nothing")
