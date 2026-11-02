@@ -18,6 +18,7 @@
 -- /mmtbuff add <spell>     add a spell to this class's list
 -- /mmtbuff remove <spell>  remove one
 -- /mmtbuff reset           back to the default list
+-- /mmtbuff debug          print every buff key press that reaches this character
 -- /mmtbuff test            say what the next press of each key would cast
 
 local MMT = MMT
@@ -121,10 +122,16 @@ local function MakeButton(name, pick)
     local b = CreateFrame("Button", name, UIParent, "SecureActionButtonTemplate")
     b:RegisterForClicks("AnyDown", "AnyUp")
     b:SetAttribute("type", nil)
-    b:SetScript("PreClick", function(self)
+    b:SetScript("PreClick", function(self, button, down)
+        if M.db and M.db.debug then
+            MMT.Print("[buff debug] %s %s at %.1f, combat=%s", name, down and "down" or "up", GetTime(), tostring(InCombatLockdown()))
+        end
         if InCombatLockdown() then return end
         if not M.enabled then self:SetAttribute("type", nil) return end
         local spell, unit = pick()
+        if M.db and M.db.debug then
+            MMT.Print("[buff debug]   -> %s", spell and (spell .. " on " .. tostring(UnitName(unit))) or "nothing to do")
+        end
         if spell then
             self:SetAttribute("type", "spell")
             self:SetAttribute("spell", spell)
@@ -182,6 +189,9 @@ SlashCmdList.MMTBUFF = function(msg)
     elseif cmd == "reset" then
         M.db.buffs[ClassToken()] = nil
         MMT.Print("Buff list: %s", #M.List() > 0 and table.concat(M.List(), ", ") or "(empty)")
+    elseif cmd == "debug" then
+        M.db.debug = not M.db.debug
+        MMT.Print("Buff key debug is %s. Every press of the buff keys that reaches this character is printed.", M.db.debug and "ON" or "off")
     elseif cmd == "why" then
         local out = {}
         local function Say(fmt, ...)
