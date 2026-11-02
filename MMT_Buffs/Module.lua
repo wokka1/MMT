@@ -49,7 +49,7 @@ local function ClassToken() return (select(2, UnitClass("player"))) end
 function M.List(class)
     class = class or ClassToken()
     local l = M.db and M.db.buffs and M.db.buffs[class]
-    if l and #l > 0 then return l end
+    if l then return l end                  -- an explicit list, even an empty one
     return DEFAULT_BUFFS[class] or {}
 end
 
@@ -219,29 +219,88 @@ M.Page = function(self, page)
     }
     local function ClassName(c) return (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[c]) or c end
     local class, picked, chosen = ClassToken() or "MAGE", nil, nil
-    local classDrop, buffDrop, suggestDrop, addBox, allText
+    local classDrop, buffDrop, suggestDrop, addBox
 
     -- right-hand column: every class's list, as the team will use them
     local right = UI.Column(page, MMT.ConfigHelpers.COL2_X, 0, MMT.ConfigHelpers.COL_W)
     right:Header("Buffs set up for the team")
-    allText = UI.Label(page, "")
-    allText:SetWidth(right.width)
-    allText:SetJustifyH("LEFT")
-    allText:SetJustifyV("TOP")
-    allText:SetPoint("TOPLEFT", page, "TOPLEFT", right.x, right.y)
-    local function ShowAll()
-        local lines = {}
-        for _, c in ipairs(CLASSES) do
-            local l = M.List(c)
-            if #l > 0 then lines[#lines + 1] = ("|cffffd100%s|r: %s"):format(ClassName(c), table.concat(l, ", ")) end
+    local pool, used = {}, 0
+    local ROWH = 20
+    local function Row()
+        used = used + 1
+        local r = pool[used]
+        if not r then
+            r = CreateFrame("Frame", nil, page)
+            r:SetSize(right.width, ROWH)
+            r.bg = r:CreateTexture(nil, "BACKGROUND")
+            r.bg:SetAllPoints()
+            r.icon = r:CreateTexture(nil, "ARTWORK")
+            r.icon:SetSize(16, 16)
+            r.icon:SetPoint("LEFT", 6, 0)
+            r.text = UI.Label(r, "", "GameFontHighlight")
+            r.text:SetPoint("LEFT", 28, 0)
+            r.del = UI.TextButton(r, "x", nil, 22)
+            r.del:SetPoint("RIGHT", -2, 0)
+            pool[used] = r
         end
-        allText:SetText(#lines > 0 and table.concat(lines, "\n\n") or "(no buffs set up)")
+        r:Show()
+        r.del:Show()
+        return r
     end
+    local ShowAll
     local function Changed()
         picked, chosen = nil, nil
         if buffDrop then buffDrop.Refresh() end
         if suggestDrop then suggestDrop.Refresh() end
         ShowAll()
+    end
+    ShowAll = function()
+        used = 0
+        for _, r in ipairs(pool) do r:Hide() end
+        local y, any = right.y, false
+        for _, c in ipairs(CLASSES) do
+            local l = M.List(c)
+            if #l > 0 then
+                any = true
+                local col = (RAID_CLASS_COLORS and RAID_CLASS_COLORS[c]) or { r = 1, g = 1, b = 1 }
+                local h = Row()
+                h:SetPoint("TOPLEFT", page, "TOPLEFT", right.x, y)
+                h.bg:SetColorTexture(col.r, col.g, col.b, 0.22)
+                h.icon:SetTexture("Interface\\TargetingFrame\\UI-Classes-Circles")
+                local co = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[c]
+                if co then h.icon:SetTexCoord(unpack(co)) else h.icon:SetTexCoord(0, 1, 0, 1) end
+                h.text:SetText(("|cff%02x%02x%02x%s|r  |cff888888(%d)|r"):format(math.floor(col.r * 255), math.floor(col.g * 255), math.floor(col.b * 255), ClassName(c), #l))
+                h.del.label:SetText("clear")
+                h.del:SetWidth(40)
+                h.del:SetScript("OnClick", function() M.db.buffs[c] = {}; Changed() end)
+                y = y - ROWH - 2
+                for _, n in ipairs(l) do
+                    local r = Row()
+                    r:SetPoint("TOPLEFT", page, "TOPLEFT", right.x, y)
+                    r.bg:SetColorTexture(1, 1, 1, 0.04)
+                    local ok, tex = pcall(C_Spell.GetSpellTexture, n)
+                    r.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+                    r.icon:SetTexture((ok and tex) or "Interface\\Icons\\INV_Misc_QuestionMark")
+                    r.text:SetText(n)
+                    r.del.label:SetText("x")
+                    r.del:SetWidth(22)
+                    r.del:SetScript("OnClick", function()
+                        Edit(function(t) for i = #t, 1, -1 do if t[i] == n then table.remove(t, i) end end end, c)
+                        Changed()
+                    end)
+                    y = y - ROWH
+                end
+                y = y - 8
+            end
+        end
+        if not any then
+            local r = Row()
+            r:SetPoint("TOPLEFT", page, "TOPLEFT", right.x, y)
+            r.bg:SetColorTexture(0, 0, 0, 0)
+            r.icon:SetTexture(nil)
+            r.text:SetText("|cff888888No buffs set up.|r")
+            r.del:Hide()
+        end
     end
 
     classDrop = col:Cycle("Class", function()
@@ -275,7 +334,7 @@ M.Page = function(self, page)
         MMT.Print("%s: added %s.", ClassName(class), text)
         Changed()
     end)
-    col:Button("Reset this class to the default list", function() M.db.buffs[class] = nil; Changed() end)
+    col:Button("Reset this class to the default list (undoes a clear)", function() M.db.buffs[class] = nil; Changed() end)
     col:Note("Add new buffs as you learn them. Each character uses its own class's list; use Sync to team to copy the lists to the other toons. Spells are cast by name, so the highest rank you know is used. Also /mmtbuff add <spell>, and /mmtbuff test shows what each key would cast next.")
     ShowAll()
 end
