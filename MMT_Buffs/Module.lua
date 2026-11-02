@@ -209,34 +209,73 @@ M.Page = function(self, page)
     col:Note("Target key: buffs your target, one buff per press. Group key: buffs you and your party one person at a time, one buff per press. Nothing already buffed is recast, and nothing is cast in combat.")
     col:Header("Buffs by class")
     local CLASSES = { "DRUID", "HUNTER", "MAGE", "PALADIN", "PRIEST", "ROGUE", "SHAMAN", "WARLOCK", "WARRIOR" }
-    local class, picked = ClassToken() or "MAGE", nil
-    local classDrop, buffDrop, addBox
-    local function Opts()
-        local t = {}
-        for _, c in ipairs(CLASSES) do t[#t + 1] = { text = (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[c]) or c, value = c } end
-        return t
+    local SUGGEST = {
+        DRUID   = { "Mark of the Wild", "Thorns" },
+        MAGE    = { "Arcane Intellect", "Dampen Magic", "Amplify Magic" },
+        PALADIN = { "Blessing of Might", "Blessing of Wisdom", "Blessing of Kings", "Blessing of Salvation" },
+        PRIEST  = { "Power Word: Fortitude", "Divine Spirit", "Shadow Protection" },
+        WARLOCK = { "Detect Invisibility", "Unending Breath" },
+        SHAMAN  = { "Water Breathing", "Water Walking" },
+    }
+    local function ClassName(c) return (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[c]) or c end
+    local class, picked, chosen = ClassToken() or "MAGE", nil, nil
+    local classDrop, buffDrop, suggestDrop, addBox, allText
+
+    -- right-hand column: every class's list, as the team will use them
+    local right = UI.Column(page, MMT.ConfigHelpers.COL2_X, 0, MMT.ConfigHelpers.COL_W)
+    right:Header("Buffs set up for the team")
+    allText = UI.Label(page, "")
+    allText:SetWidth(right.width)
+    allText:SetJustifyH("LEFT")
+    allText:SetJustifyV("TOP")
+    allText:SetPoint("TOPLEFT", page, "TOPLEFT", right.x, right.y)
+    local function ShowAll()
+        local lines = {}
+        for _, c in ipairs(CLASSES) do
+            local l = M.List(c)
+            if #l > 0 then lines[#lines + 1] = ("|cffffd100%s|r: %s"):format(ClassName(c), table.concat(l, ", ")) end
+        end
+        allText:SetText(#lines > 0 and table.concat(lines, "\n\n") or "(no buffs set up)")
     end
-    classDrop = col:Cycle("Class", Opts, function() return class end, function(v)
-        class, picked = v, nil
+    local function Changed()
+        picked, chosen = nil, nil
         if buffDrop then buffDrop.Refresh() end
-    end)
-    buffDrop = col:Cycle("Buffs (cast order)", function()
+        if suggestDrop then suggestDrop.Refresh() end
+        ShowAll()
+    end
+
+    classDrop = col:Cycle("Class", function()
+        local t = {}
+        for _, c in ipairs(CLASSES) do t[#t + 1] = { text = ClassName(c), value = c } end
+        return t
+    end, function() return class end, function(v) class = v; Changed() end)
+    buffDrop = col:Cycle("Current buffs (cast order)", function()
         local t = {}
         for _, n in ipairs(M.List(class)) do t[#t + 1] = { text = n, value = n } end
         return t
     end, function() return picked end, function(v) picked = v end)
     col:Button("Remove the selected buff", function()
-        if not picked then MMT.Print("Pick a buff first.") return end
+        if not picked then MMT.Print("Pick a buff in the list first.") return end
         Edit(function(l) for i = #l, 1, -1 do if l[i] == picked then table.remove(l, i) end end end, class)
-        picked = nil; buffDrop.Refresh()
+        Changed()
     end)
-    addBox = col:Add(UI.EditBox(page, col.width, "Add a buff to this class by spell name (Enter)", function(text, box)
-        text = Trim(text)
-        if text ~= "" then
-            Edit(function(l) for _, s in ipairs(l) do if s:lower() == text:lower() then return end end l[#l + 1] = text end, class)
-        end
-        box:SetText(""); box:ClearFocus(); buffDrop.Refresh()
-    end))
-    col:Button("Reset this class to the default list", function() M.db.buffs[class] = nil; picked = nil; buffDrop.Refresh() end)
-    col:Note("Add new buffs as you learn them. The class lists sync to the team (Sync to team), and each character uses its own class's list. Spells are cast by name, so the highest rank you know is used. Also /mmtbuff add <spell> on the character, and /mmtbuff test shows what each key would cast next.")
+    suggestDrop = col:Cycle("Suggested buffs to add", function()
+        local t, have = {}, {}
+        for _, n in ipairs(M.List(class)) do have[n] = true end
+        for _, n in ipairs(SUGGEST[class] or {}) do if not have[n] then t[#t + 1] = { text = n, value = n } end end
+        return t
+    end, function() return chosen end, function(v) chosen = v end)
+    addBox = col:Add(UI.EditBox(page, col.width, "...or type a spell name", function() end))
+    col:Button("Add buff", function()
+        local text = Trim(addBox:GetText())
+        if text == "" then text = chosen or "" end
+        if text == "" then MMT.Print("Pick a suggested buff or type a spell name first.") return end
+        Edit(function(l) for _, s in ipairs(l) do if s:lower() == text:lower() then return end end l[#l + 1] = text end, class)
+        addBox:SetText(""); addBox:ClearFocus()
+        MMT.Print("%s: added %s.", ClassName(class), text)
+        Changed()
+    end)
+    col:Button("Reset this class to the default list", function() M.db.buffs[class] = nil; Changed() end)
+    col:Note("Add new buffs as you learn them. Each character uses its own class's list; use Sync to team to copy the lists to the other toons. Spells are cast by name, so the highest rank you know is used. Also /mmtbuff add <spell>, and /mmtbuff test shows what each key would cast next.")
+    ShowAll()
 end
