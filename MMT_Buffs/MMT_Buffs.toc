@@ -1,0 +1,12 @@
+## Interface: 16001
+## Title: MMT - Buffs
+## Notes: MMT module: one key buffs the player you target, another buffs the whole group one person at a time. Never recasts a buff that is still up.
+## Version: 1.0.0
+## Author: wokka1
+## X-Repository: https://github.com/wokka1/MMT
+## Dependencies: MMT
+## X-MMT-Module: 1
+## X-MMT-Title: Buffs
+## IconTexture: Interface\Icons\Spell_Holy_MagicalSentry
+
+Module.lua

@@ -32,7 +32,9 @@ Saved data from MMT 0.1.x is converted automatically.
   Distribution** (`MMT_LootDistribution`), **Quest Tracker** (`MMT_QuestTracker`), **Statistics**
   (`MMT_Statistics`), **Team Launch**
   (`MMT_TeamLaunch`: named team presets, restore the last team, invite-team key and button, add
-  characters by name; `/mmtteam`).
+  characters by name; `/mmtteam`), **Buffs**
+  (`MMT_Buffs`: one key buffs your target, another buffs the group one person at a time, never recasting
+  a buff that is still up; per-class buff lists; `/mmtbuff`).
 - Lists that scroll (the page list, module and team lists) show a small arrow at the top or
   bottom edge while there is more above or below; clicking it scrolls.
 - Settings sync for modules: add `sync = true` to `MMT.NewModule{...}` and the module gets

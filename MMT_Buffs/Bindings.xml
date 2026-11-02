@@ -1,0 +1,4 @@
+<Bindings>
+    <Binding name="CLICK MMTBuffTarget:LeftButton" header="MMT_BUFFS" category="BINDING_CATEGORY_MMT"/>
+    <Binding name="CLICK MMTBuffGroup:LeftButton"/>
+</Bindings>
