@@ -207,7 +207,14 @@ local function MakeButton(name, pick)
                 tostring(UnitIsPlayer(u)), tostring(UnitIsDeadOrGhost(u)), table.concat(auras, ","),
                 table.concat(M.List(), ","))
         end
-        if spell and ShortOfMana(spell) then
+        -- A Lua error here used to abort this handler before the cast was armed (no error
+        -- popup, no cast). Fail open: if the mana check breaks, cast anyway and log why.
+        local short = false
+        if spell then
+            local okm, res = pcall(ShortOfMana, spell)
+            if okm then short = res else BLog(true, "ShortOfMana ERROR: %s", tostring(res)) end
+        end
+        if spell and short then
             local okc, costs = pcall(C_Spell.GetSpellPowerCost, spell)
             local parts = {}
             if okc and type(costs) == "table" then
