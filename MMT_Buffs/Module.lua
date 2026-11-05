@@ -45,6 +45,7 @@ local M = MMT.NewModule({
         selfBuffs = {},              -- [CLASS] = { spell names } cast on yourself only; no defaults
         keyTarget = "ALT-INSERT",
         keyGroup = "ALT-PAGEUP",
+        sayOom = true,               -- say in party chat when out of mana for the next buff
     },
 })
 
@@ -128,6 +129,27 @@ local function PickSelf()
     end
 end
 
+-- Out of mana for this spell? (only mana costs are checked)
+local function ShortOfMana(spell)
+    local ok, costs = pcall(C_Spell.GetSpellPowerCost, spell)
+    if not ok or type(costs) ~= "table" then return false end
+    for _, c in ipairs(costs) do
+        if c.type == 0 and (c.cost or 0) > 0 then
+            return (UnitPower("player", 0) or 0) < c.cost
+        end
+    end
+    return false
+end
+
+local lastOom = 0
+local function SayOom(spell)
+    if not (M.db and M.db.sayOom) or not IsInGroup() then return end
+    local now = GetTime()
+    if now - lastOom < 30 then return end       -- the keys get pressed many times in a row
+    lastOom = now
+    pcall(SendChatMessage, ("Out of mana, can't cast %s."):format(spell), "PARTY")
+end
+
 local function GroupUnits()
     local t = { "player" }
     for i = 1, 4 do t[#t + 1] = "party" .. i end
@@ -158,7 +180,10 @@ local function MakeButton(name, pick)
         if M.db and M.db.debug then
             MMT.Print("[buff debug]   -> %s", spell and (spell .. " on " .. tostring(UnitName(unit))) or "nothing to do")
         end
-        if spell then
+        if spell and ShortOfMana(spell) then
+            SayOom(spell)
+            self:SetAttribute("type", nil)
+        elseif spell then
             self:SetAttribute("type", "spell")
             self:SetAttribute("spell", spell)
             self:SetAttribute("unit", unit)
@@ -299,6 +324,7 @@ M.Page = function(self, page)
     col:Add(UI.EditBox(page, col.width, "Group key (e.g. ALT-PAGEUP; empty = none)", function(text, box)
         M.db.keyGroup = Trim(text):upper(); ApplyKeys(); box:ClearFocus()
     end)):SetText(M.db.keyGroup)
+    col:Check("Say in party chat when out of mana for a buff", function() return M.db.sayOom end, function(v) M.db.sayOom = v and true or false end)
     col:Note("Target key: buffs your target, one buff per press. Group key: casts your self buffs first, then buffs you and your party one person at a time, one buff per press. Nothing already buffed is recast, and nothing is cast in combat.")
     col:Header("Buffs by class")
     local CLASSES = { "DRUID", "HUNTER", "MAGE", "PALADIN", "PRIEST", "ROGUE", "SHAMAN", "WARLOCK", "WARRIOR" }
