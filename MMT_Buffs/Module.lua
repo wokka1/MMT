@@ -208,9 +208,16 @@ local function MakeButton(name, pick)
                 table.concat(M.List(), ","))
         end
         if spell and ShortOfMana(spell) then
+            local okc, costs = pcall(C_Spell.GetSpellPowerCost, spell)
+            local parts = {}
+            if okc and type(costs) == "table" then
+                for _, c in ipairs(costs) do parts[#parts + 1] = tostring(c.type) .. ":" .. tostring(c.cost) end
+            end
+            BLog(false, "     SKIPPED: short of mana. mana=%s costs=[%s]", tostring(UnitPower("player", 0)), table.concat(parts, ","))
             SayOom(spell)
             self:SetAttribute("type", nil)
         elseif spell then
+            BLog(false, "     set type=spell spell=%s unit=%s (button now: %s/%s/%s)", spell, tostring(unit), tostring(self:GetAttribute("type")), tostring(self:GetAttribute("spell")), tostring(self:GetAttribute("unit")))
             self:SetAttribute("type", "spell")
             self:SetAttribute("spell", spell)
             self:SetAttribute("unit", unit)
