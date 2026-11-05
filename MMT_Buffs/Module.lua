@@ -224,6 +224,24 @@ end
 MakeButton("MMTBuffTarget", M.NextTarget)
 MakeButton("MMTBuffGroup", M.NextGroup)
 
+-- Debug only: what happens to the cast after the button picks a spell (who it
+-- was sent at, whether it failed and why). Written to MMTDB.buffLog too.
+local castLog = CreateFrame("Frame")
+for _, ev in ipairs({ "UNIT_SPELLCAST_SENT", "UNIT_SPELLCAST_START", "UNIT_SPELLCAST_SUCCEEDED",
+                      "UNIT_SPELLCAST_FAILED", "UNIT_SPELLCAST_FAILED_QUIET", "UNIT_SPELLCAST_INTERRUPTED",
+                      "UI_ERROR_MESSAGE" }) do
+    castLog:RegisterEvent(ev)
+end
+castLog:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
+    if not (M.db and M.db.debug) then return end
+    if event == "UI_ERROR_MESSAGE" then
+        BLog(false, "     [%s] code=%s text=%s", event, tostring(a1), tostring(a2))
+    elseif a1 == "player" then
+        local sp = a4 and C_Spell.GetSpellName and C_Spell.GetSpellName(a4) or tostring(a4)
+        BLog(false, "     [%s] spell=%s target/arg=%s", event, tostring(sp), tostring(a2))
+    end
+end)
+
 -- Keys: override bindings, re-applied at login and after combat, so no manual
 -- keybinding setup is needed on each character. Remove a key in /mmt > Buffs.
 local owner = CreateFrame("Frame")
