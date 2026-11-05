@@ -135,7 +135,11 @@ local function ShortOfMana(spell)
     if not ok or type(costs) ~= "table" then return false end
     for _, c in ipairs(costs) do
         if c.type == 0 and (c.cost or 0) > 0 then
-            return (UnitPower("player", 0) or 0) < c.cost
+            -- Newer clients return "secret" numbers here; comparing one is a Lua error
+            -- (that error used to abort the whole key press). Can't compare -> not short.
+            local power = UnitPower("player", 0)
+            if issecretvalue and (issecretvalue(power) or issecretvalue(c.cost)) then return false end
+            return (power or 0) < c.cost
         end
     end
     return false
@@ -228,6 +232,7 @@ local function MakeButton(name, pick)
             self:SetAttribute("type", "spell")
             self:SetAttribute("spell", spell)
             self:SetAttribute("unit", unit)
+            M.lastSpell, M.lastTime = spell, GetTime()
         else
             self:SetAttribute("type", nil)
         end
@@ -247,6 +252,12 @@ for _, ev in ipairs({ "UNIT_SPELLCAST_SENT", "UNIT_SPELLCAST_START", "UNIT_SPELL
     castLog:RegisterEvent(ev)
 end
 castLog:SetScript("OnEvent", function(_, event, a1, a2, a3, a4)
+    -- The client reports "Not enough mana" right after the click that cast. Use that to
+    -- warn the party, since the mana level itself may be unreadable (secret value).
+    if event == "UI_ERROR_MESSAGE" and M.lastSpell and GetTime() - (M.lastTime or 0) < 2 then
+        local okm, isOom = pcall(function() return a2 == ERR_OUT_OF_MANA end)
+        if okm and isOom then SayOom(M.lastSpell) end
+    end
     if not (M.db and M.db.debug) then return end
     if event == "UI_ERROR_MESSAGE" then
         BLog(false, "     [%s] code=%s text=%s", event, tostring(a1), tostring(a2))
