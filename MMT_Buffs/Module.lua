@@ -166,20 +166,31 @@ end
 ---------------------------------------------------------------------------
 -- Secure buttons
 ---------------------------------------------------------------------------
+-- Debug lines go to chat AND to MMTDB.buffLog (saved on /reload or logout), so
+-- they can be read from disk when the chat text can't be copied out of the game.
+local function BLog(always, fmt, ...)
+    if not always and not (M.db and M.db.debug) then return end
+    local ok, msg = pcall(string.format, fmt, ...)
+    if not ok then msg = tostring(fmt) end
+    if M.db and M.db.debug then MMT.Print("[buff debug] %s", msg) end
+    if MMTDB then
+        MMTDB.buffLog = MMTDB.buffLog or {}
+        local log = MMTDB.buffLog
+        log[#log + 1] = date("%H:%M:%S") .. " " .. msg
+        if #log > 200 then table.remove(log, 1) end
+    end
+end
+
 local function MakeButton(name, pick)
     local b = CreateFrame("Button", name, UIParent, "SecureActionButtonTemplate")
     b:RegisterForClicks("AnyDown", "AnyUp")
     b:SetAttribute("type", nil)
     b:SetScript("PreClick", function(self, button, down)
-        if M.db and M.db.debug then
-            MMT.Print("[buff debug] %s %s at %.1f, combat=%s", name, down and "down" or "up", GetTime(), tostring(InCombatLockdown()))
-        end
+        BLog(false, "%s %s at %.1f, combat=%s, enabled=%s", name, down and "down" or "up", GetTime(), tostring(InCombatLockdown()), tostring(M.enabled))
         if InCombatLockdown() then return end
         if not M.enabled then self:SetAttribute("type", nil) return end
         local spell, unit = pick()
-        if M.db and M.db.debug then
-            MMT.Print("[buff debug]   -> %s", spell and (spell .. " on " .. tostring(UnitName(unit))) or "nothing to do")
-        end
+        BLog(false, "  -> %s", spell and (spell .. " on " .. tostring(UnitName(unit))) or "nothing to do")
         if spell and ShortOfMana(spell) then
             SayOom(spell)
             self:SetAttribute("type", nil)
@@ -201,8 +212,9 @@ MakeButton("MMTBuffGroup", M.NextGroup)
 -- keybinding setup is needed on each character. Remove a key in /mmt > Buffs.
 local owner = CreateFrame("Frame")
 local function ApplyKeys()
-    if InCombatLockdown() then return end
+    if InCombatLockdown() then BLog(true, "ApplyKeys skipped: in combat") return end
     ClearOverrideBindings(owner)
+    BLog(true, "ApplyKeys: enabled=%s keyTarget=%s keyGroup=%s", tostring(M.enabled), tostring(M.db and M.db.keyTarget), tostring(M.db and M.db.keyGroup))
     if not M.enabled or not M.db then return end
     if M.db.keyTarget ~= "" then SetOverrideBindingClick(owner, true, M.db.keyTarget, "MMTBuffTarget") end
     if M.db.keyGroup ~= "" then SetOverrideBindingClick(owner, true, M.db.keyGroup, "MMTBuffGroup") end
