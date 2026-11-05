@@ -10,6 +10,9 @@
 --   turn and casts the first buff from the list that somebody is missing.
 --   Press until nothing is left to do.
 --
+-- Self buffs (Demon Skin, Frost Armor, ...) are a second list per class and are
+-- cast on you only. The Group key does them first, then the team buffs.
+--
 -- Nothing is recast while it is still up, so extra presses do nothing. Spells
 -- are cast by name, which uses the highest rank you know: a new rank is picked
 -- up as soon as it is learned. Out of combat only.
@@ -17,6 +20,9 @@
 -- /mmtbuff                 status and the buff list
 -- /mmtbuff add <spell>     add a spell to this class's list
 -- /mmtbuff remove <spell>  remove one
+-- /mmtbuff addself <spell> add a spell to this class's self buff list
+-- /mmtbuff removeself <spell>  remove one
+-- /mmtbuff resetself       empty the self buff list
 -- /mmtbuff reset           back to the default list
 -- /mmtbuff debug          print every buff key press that reaches this character
 -- /mmtbuff test            say what the next press of each key would cast
@@ -36,6 +42,7 @@ local M = MMT.NewModule({
     sync = true,
     defaults = {
         buffs = {},                  -- [CLASS] = { spell names }; empty = the defaults above
+        selfBuffs = {},              -- [CLASS] = { spell names } cast on yourself only; no defaults
         keyTarget = "ALT-INSERT",
         keyGroup = "ALT-PAGEUP",
     },
@@ -52,6 +59,12 @@ function M.List(class)
     local l = M.db and M.db.buffs and M.db.buffs[class]
     if l then return l end                  -- an explicit list, even an empty one
     return DEFAULT_BUFFS[class] or {}
+end
+
+function M.SelfList(class)
+    class = class or ClassToken()
+    local t = M.db and M.db.selfBuffs
+    return (t and t[class]) or {}
 end
 
 local function Known(spell)
@@ -106,6 +119,15 @@ local function Pick(units)
     end
 end
 
+-- The first self buff you are missing, or nil. Cast on yourself, so no range check.
+local function PickSelf()
+    for _, spell in ipairs(M.SelfList()) do
+        if Known(spell) and CanBuff("player") and HasBuff("player", spell) == false then
+            return spell, "player"
+        end
+    end
+end
+
 local function GroupUnits()
     local t = { "player" }
     for i = 1, 4 do t[#t + 1] = "party" .. i end
@@ -113,7 +135,11 @@ local function GroupUnits()
 end
 
 function M.NextTarget() return Pick({ "target" }) end
-function M.NextGroup() return Pick(GroupUnits()) end
+function M.NextGroup()
+    local spell, unit = PickSelf()
+    if spell then return spell, unit end
+    return Pick(GroupUnits())
+end
 
 ---------------------------------------------------------------------------
 -- Secure buttons
@@ -173,10 +199,30 @@ local function Trim(s) return (tostring(s or ""):gsub("^%s+", ""):gsub("%s+$", "
 local function Edit(fn, class)
     class = class or ClassToken()
     local l = {}
-    for _, s in ipairs(M.List()) do l[#l + 1] = s end
+    for _, s in ipairs(M.List(class)) do l[#l + 1] = s end
     fn(l)
     M.db.buffs[class] = l
 end
+
+local function EditSelf(fn, class)
+    class = class or ClassToken()
+    local l = {}
+    for _, s in ipairs(M.SelfList(class)) do l[#l + 1] = s end
+    fn(l)
+    M.db.selfBuffs = M.db.selfBuffs or {}
+    M.db.selfBuffs[class] = l
+end
+
+local function AddTo(l, spell)
+    for _, s in ipairs(l) do if s:lower() == spell:lower() then return end end
+    l[#l + 1] = spell
+end
+
+local function RemoveFrom(l, spell)
+    for i = #l, 1, -1 do if l[i]:lower() == spell:lower() then table.remove(l, i) end end
+end
+
+local function Listing(l) return #l > 0 and table.concat(l, ", ") or "(empty)" end
 
 SLASH_MMTBUFF1 = "/mmtbuff"
 SlashCmdList.MMTBUFF = function(msg)
@@ -189,6 +235,15 @@ SlashCmdList.MMTBUFF = function(msg)
     elseif cmd == "remove" and rest ~= "" then
         Edit(function(l) for i = #l, 1, -1 do if l[i]:lower() == rest:lower() then table.remove(l, i) end end end)
         MMT.Print("Buff list: %s", #M.List() > 0 and table.concat(M.List(), ", ") or "(empty)")
+    elseif cmd == "addself" and rest ~= "" then
+        EditSelf(function(l) AddTo(l, rest) end)
+        MMT.Print("Self buff list: %s", Listing(M.SelfList()))
+    elseif cmd == "removeself" and rest ~= "" then
+        EditSelf(function(l) RemoveFrom(l, rest) end)
+        MMT.Print("Self buff list: %s", Listing(M.SelfList()))
+    elseif cmd == "resetself" then
+        EditSelf(function(l) wipe(l) end)
+        MMT.Print("Self buff list: %s", Listing(M.SelfList()))
     elseif cmd == "reset" then
         M.db.buffs[ClassToken()] = nil
         MMT.Print("Buff list: %s", #M.List() > 0 and table.concat(M.List(), ", ") or "(empty)")
@@ -203,6 +258,10 @@ SlashCmdList.MMTBUFF = function(msg)
             MMT.Print("%s", line)
         end
         Say("%s, class %s, level %s", UnitName("player"), tostring(ClassToken()), tostring(UnitLevel("player")))
+        Say("self list: %s", Listing(M.SelfList()))
+        for _, spell in ipairs(M.SelfList()) do
+            Say("  %s: known=%s buffed=%s", spell, tostring(Known(spell)), tostring(HasBuff("player", spell)))
+        end
         Say("list: %s", table.concat(M.List(), ", "))
         for _, spell in ipairs(M.List()) do
             Say("%s: known=%s", spell, tostring(Known(spell)))
@@ -222,7 +281,8 @@ SlashCmdList.MMTBUFF = function(msg)
         MMT.Print("Group key would cast: %s", s and (s .. " on " .. UnitName(u)) or "nothing")
     else
         MMT.Print("Buffs (%s): %s", ClassToken() or "?", #M.List() > 0 and table.concat(M.List(), ", ") or "(nothing for this class)")
-        MMT.Print("Keys: target %s, group %s. /mmtbuff add|remove <spell>, reset, test", M.db.keyTarget, M.db.keyGroup)
+        MMT.Print("Self buffs (%s): %s", ClassToken() or "?", Listing(M.SelfList()))
+        MMT.Print("Keys: target %s, group %s. /mmtbuff add|remove <spell>, addself|removeself <spell>, reset, resetself, test", M.db.keyTarget, M.db.keyGroup)
     end
 end
 
@@ -239,7 +299,7 @@ M.Page = function(self, page)
     col:Add(UI.EditBox(page, col.width, "Group key (e.g. ALT-PAGEUP; empty = none)", function(text, box)
         M.db.keyGroup = Trim(text):upper(); ApplyKeys(); box:ClearFocus()
     end)):SetText(M.db.keyGroup)
-    col:Note("Target key: buffs your target, one buff per press. Group key: buffs you and your party one person at a time, one buff per press. Nothing already buffed is recast, and nothing is cast in combat.")
+    col:Note("Target key: buffs your target, one buff per press. Group key: casts your self buffs first, then buffs you and your party one person at a time, one buff per press. Nothing already buffed is recast, and nothing is cast in combat.")
     col:Header("Buffs by class")
     local CLASSES = { "DRUID", "HUNTER", "MAGE", "PALADIN", "PRIEST", "ROGUE", "SHAMAN", "WARLOCK", "WARRIOR" }
     local SUGGEST = {
@@ -281,7 +341,11 @@ M.Page = function(self, page)
         return r
     end
     local ShowAll
+    local selfPicked
+    local selfDrop, selfAddBox
     local function Changed()
+        selfPicked = nil
+        if selfDrop then selfDrop.Refresh() end
         picked, chosen = nil, nil
         if buffDrop then buffDrop.Refresh() end
         if suggestDrop then suggestDrop.Refresh() end
@@ -291,10 +355,24 @@ M.Page = function(self, page)
         used = 0
         for _, r in ipairs(pool) do r:Hide() end
         local y, any = right.y, false
-        for _, c in ipairs(CLASSES) do
-            local l = M.List(c)
-            if #l > 0 then
+        local function Section(title, get, edit, clear)
+            local rows = {}
+            for _, c in ipairs(CLASSES) do
+                if #get(c) > 0 then rows[#rows + 1] = c end
+            end
+            if title then
+                local r = Row()
+                r:SetPoint("TOPLEFT", page, "TOPLEFT", right.x, y)
+                r.bg:SetColorTexture(0, 0, 0, 0)
+                r.icon:SetTexture(nil)
+                r.text:SetText("|cffffd100" .. title .. "|r")
+                r.text:SetPoint("LEFT", 6, 0)
+                r.del:Hide()
+                y = y - ROWH - 2
+            end
+            for _, c in ipairs(rows) do
                 any = true
+                local l = get(c)
                 local col = (RAID_CLASS_COLORS and RAID_CLASS_COLORS[c]) or { r = 1, g = 1, b = 1 }
                 local h = Row()
                 h:SetPoint("TOPLEFT", page, "TOPLEFT", right.x, y)
@@ -302,10 +380,11 @@ M.Page = function(self, page)
                 h.icon:SetTexture("Interface\\TargetingFrame\\UI-Classes-Circles")
                 local co = CLASS_ICON_TCOORDS and CLASS_ICON_TCOORDS[c]
                 if co then h.icon:SetTexCoord(unpack(co)) else h.icon:SetTexCoord(0, 1, 0, 1) end
+                h.text:SetPoint("LEFT", 28, 0)
                 h.text:SetText(("|cff%02x%02x%02x%s|r  |cff888888(%d)|r"):format(math.floor(col.r * 255), math.floor(col.g * 255), math.floor(col.b * 255), ClassName(c), #l))
                 h.del.label:SetText("clear")
                 h.del:SetWidth(40)
-                h.del:SetScript("OnClick", function() M.db.buffs[c] = {}; Changed() end)
+                h.del:SetScript("OnClick", function() clear(c); Changed() end)
                 y = y - ROWH - 2
                 for _, n in ipairs(l) do
                     local r = Row()
@@ -314,23 +393,29 @@ M.Page = function(self, page)
                     local ok, tex = pcall(C_Spell.GetSpellTexture, n)
                     r.icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
                     r.icon:SetTexture((ok and tex) or "Interface\\Icons\\INV_Misc_QuestionMark")
+                    r.text:SetPoint("LEFT", 28, 0)
                     r.text:SetText(n)
                     r.del.label:SetText("x")
                     r.del:SetWidth(22)
                     r.del:SetScript("OnClick", function()
-                        Edit(function(t) for i = #t, 1, -1 do if t[i] == n then table.remove(t, i) end end end, c)
+                        edit(function(t) for i = #t, 1, -1 do if t[i] == n then table.remove(t, i) end end end, c)
                         Changed()
                     end)
                     y = y - ROWH
                 end
                 y = y - 8
             end
+            return #rows > 0
         end
+        Section(nil, M.List, Edit, function(c) M.db.buffs[c] = {} end)
+        y = y - 4
+        local anySelf = Section("Self buffs (cast on yourself first)", M.SelfList, EditSelf, function(c) EditSelf(function(t) wipe(t) end, c) end)
         if not any then
             local r = Row()
             r:SetPoint("TOPLEFT", page, "TOPLEFT", right.x, y)
             r.bg:SetColorTexture(0, 0, 0, 0)
             r.icon:SetTexture(nil)
+            r.text:SetPoint("LEFT", 28, 0)
             r.text:SetText("|cff888888No buffs set up.|r")
             r.del:Hide()
         end
@@ -368,6 +453,27 @@ M.Page = function(self, page)
         Changed()
     end)
     col:Button("Reset this class to the default list (undoes a clear)", function() M.db.buffs[class] = nil; Changed() end)
+    col:Header("Self buffs for this class")
+    selfDrop = col:Cycle("Current self buffs (cast order)", function()
+        local t = {}
+        for _, n in ipairs(M.SelfList(class)) do t[#t + 1] = { text = n, value = n } end
+        return t
+    end, function() return selfPicked end, function(v) selfPicked = v end)
+    col:Button("Remove the selected self buff", function()
+        if not selfPicked then MMT.Print("Pick a self buff in the list first.") return end
+        EditSelf(function(l) RemoveFrom(l, selfPicked) end, class)
+        Changed()
+    end)
+    selfAddBox = col:Add(UI.EditBox(page, col.width, "Self buff spell name (e.g. Demon Skin, Frost Armor)", function() end))
+    col:Button("Add self buff", function()
+        local text = Trim(selfAddBox:GetText())
+        if text == "" then MMT.Print("Type a spell name first.") return end
+        EditSelf(function(l) AddTo(l, text) end, class)
+        selfAddBox:SetText(""); selfAddBox:ClearFocus()
+        MMT.Print("%s: added self buff %s.", ClassName(class), text)
+        Changed()
+    end)
+    col:Note("Self buffs are cast on you only, before any team buff, when you press the Group key. You choose them for each class; there are no defaults. Also /mmtbuff addself <spell>.")
     col:Note("Add new buffs as you learn them. Each character uses its own class's list; use Sync to team to copy the lists to the other toons. Spells are cast by name, so the highest rank you know is used. Also /mmtbuff add <spell>, and /mmtbuff test shows what each key would cast next.")
     ShowAll()
 end
