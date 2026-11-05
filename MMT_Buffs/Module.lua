@@ -191,6 +191,22 @@ local function MakeButton(name, pick)
         if not M.enabled then self:SetAttribute("type", nil) return end
         local spell, unit = pick()
         BLog(false, "  -> %s", spell and (spell .. " on " .. tostring(UnitName(unit))) or "nothing to do")
+        if M.db and M.db.debug then
+            -- why: state of the unit this key looks at, and the buffs it can see on it
+            local u = (name == "MMTBuffTarget") and "target" or (unit or "player")
+            local auras = {}
+            pcall(function()
+                for i = 1, 40 do
+                    local a = C_UnitAuras.GetAuraDataByIndex(u, i, "HELPFUL")
+                    if not a then break end
+                    auras[#auras + 1] = tostring(a.name)
+                end
+            end)
+            BLog(false, "     unit=%s exists=%s name=%s friend=%s player=%s dead=%s auras=[%s] list=[%s]", u,
+                tostring(UnitExists(u)), tostring(UnitName(u)), tostring(UnitIsFriend("player", u)),
+                tostring(UnitIsPlayer(u)), tostring(UnitIsDeadOrGhost(u)), table.concat(auras, ","),
+                table.concat(M.List(), ","))
+        end
         if spell and ShortOfMana(spell) then
             SayOom(spell)
             self:SetAttribute("type", nil)
