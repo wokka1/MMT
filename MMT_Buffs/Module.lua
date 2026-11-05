@@ -310,6 +310,16 @@ M.Page = function(self, page)
         WARLOCK = { "Detect Invisibility", "Unending Breath" },
         SHAMAN  = { "Water Breathing", "Water Walking" },
     }
+    local SELF_SUGGEST = {
+        DRUID   = { "Thorns", "Omen of Clarity" },
+        HUNTER  = { "Aspect of the Hawk", "Aspect of the Monkey", "Aspect of the Cheetah" },
+        MAGE    = { "Frost Armor", "Ice Armor", "Mage Armor", "Ice Barrier", "Mana Shield" },
+        PALADIN = { "Devotion Aura", "Retribution Aura", "Seal of Righteousness" },
+        PRIEST  = { "Inner Fire", "Shadowguard" },
+        SHAMAN  = { "Lightning Shield", "Water Shield" },
+        WARLOCK = { "Demon Skin", "Demon Armor", "Fel Armor", "Unending Breath" },
+        WARRIOR = { "Battle Shout" },
+    }
     local function ClassName(c) return (LOCALIZED_CLASS_NAMES_MALE and LOCALIZED_CLASS_NAMES_MALE[c]) or c end
     local class, picked, chosen = ClassToken() or "MAGE", nil, nil
     local classDrop, buffDrop, suggestDrop, addBox
@@ -342,10 +352,11 @@ M.Page = function(self, page)
     end
     local ShowAll
     local selfPicked
-    local selfDrop, selfAddBox
+    local selfDrop, selfAddBox, selfSuggestDrop, selfChosen
     local function Changed()
-        selfPicked = nil
+        selfPicked, selfChosen = nil, nil
         if selfDrop then selfDrop.Refresh() end
+        if selfSuggestDrop then selfSuggestDrop.Refresh() end
         picked, chosen = nil, nil
         if buffDrop then buffDrop.Refresh() end
         if suggestDrop then suggestDrop.Refresh() end
@@ -464,10 +475,17 @@ M.Page = function(self, page)
         EditSelf(function(l) RemoveFrom(l, selfPicked) end, class)
         Changed()
     end)
-    selfAddBox = col:Add(UI.EditBox(page, col.width, "Self buff spell name (e.g. Demon Skin, Frost Armor)", function() end))
+    selfSuggestDrop = col:Cycle("Suggested self buffs to add", function()
+        local t, have = {}, {}
+        for _, n in ipairs(M.SelfList(class)) do have[n] = true end
+        for _, n in ipairs(SELF_SUGGEST[class] or {}) do if not have[n] then t[#t + 1] = { text = n, value = n } end end
+        return t
+    end, function() return selfChosen end, function(v) selfChosen = v end)
+    selfAddBox = col:Add(UI.EditBox(page, col.width, "...or type a spell name", function() end))
     col:Button("Add self buff", function()
         local text = Trim(selfAddBox:GetText())
-        if text == "" then MMT.Print("Type a spell name first.") return end
+        if text == "" then text = selfChosen or "" end
+        if text == "" then MMT.Print("Pick a suggested self buff or type a spell name first.") return end
         EditSelf(function(l) AddTo(l, text) end, class)
         selfAddBox:SetText(""); selfAddBox:ClearFocus()
         MMT.Print("%s: added self buff %s.", ClassName(class), text)
