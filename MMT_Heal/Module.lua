@@ -21,7 +21,9 @@
 --
 -- /mmtheal                       show keys and spells
 -- /mmtheal spell <plain|shift|ctrl|alt> <spell>   set (no spell = empty)
--- Target "target" = heal the master's target (for people outside the team): /mmtheal slot 10 target (F12 by default)
+-- Target "master" = the master's (leader's) target, read straight from the game (partyNtarget), so no
+-- Assist Master step is needed and nothing races: /mmtheal slot 12 master (F12 by default).
+-- ("target" is accepted as an old name for it.)
 -- /mmtheal key <slot#> <KEY> [target]             e.g. /mmtheal key 1 F1 Wokka-Zha
 -- /mmtheal slot <slot#> <target>   target = self | <team key, e.g. Wokka-Zha> | pet <team key> | party1..
 -- /mmtheal unbind <slot#>     /mmtheal add <KEY> <unit>
@@ -30,8 +32,7 @@
 
 local MMT = MMT
 
--- Targets: "self", "target" (whatever the druid has targeted; the ISBoxer F10 and F12 keys assist the
--- master first, so it heals the master's target, like the Buff Target key), "mem:<team key>", "pet:<team key>". Defaults follow the team order
+-- Targets: "self", "master" (the leader's target, via @partyNtarget), "mem:<team key>", "pet:<team key>". Defaults follow the team order
 -- (slot 1 = F1, slot 2 = F2 ...), then each member's pet on F5-F8.
 local function DefaultSlots()
     local t = {}
@@ -42,7 +43,7 @@ local function DefaultSlots()
         for i = 1, 4 do t[#t + 1] = { key = "F" .. i, unit = "party" .. i } end
     end
     t[#t + 1] = { key = "F9", unit = "self" }
-    t[#t + 1] = { key = "F12", unit = "target" }           -- the master's target (ISBoxer assists the master first)
+    t[#t + 1] = { key = "F12", unit = "master" }
     return t
 end
 local DEFAULT_SPELLS = { plain = "Rejuvenation", shift = "Healing Touch", ctrl = "", alt = "" }
@@ -125,12 +126,25 @@ local function PetOf(unit)
     return (unit:gsub("^party", "partypet"))
 end
 
+-- the unit token of the master (the FTL leader): "player", "party1".., or nil when not in the group
+local function MasterUnit()
+    local key = MMT.FTLLeader and MMT.FTLLeader()
+    if not key then return nil end
+    if MMT.IsSelf and MMT.IsSelf(key) then return "player" end
+    return UnitOfMember(key)
+end
+
 -- target spec -> unit token, or nil when that character/pet is not in the group right now
 local function Resolve(spec)
     spec = Trim(spec)
     if spec == "" then return nil end
     local l = spec:lower()
     if l == "self" then return "player" end
+    if l == "master" or l == "target" then
+        local mu = MasterUnit()
+        if not mu then return nil end
+        return mu .. "target"            -- "playertarget" is valid too
+    end
     local kind, key = spec:match("^(%a+):(.+)$")
     if kind == "mem" then return UnitOfMember(key) end
     if kind == "pet" then
@@ -146,7 +160,7 @@ local function Describe(spec)
     spec = Trim(spec)
     local l = spec:lower()
     if l == "self" or l == "player" then return "Yourself" end
-    if l == "target" then return "Master's target (assist first)" end
+    if l == "target" or l == "master" then return "Master's target" end
     local kind, key = spec:match("^(%a+):(.+)$")
     local function Shown(k) local ok, n = pcall(MMT.ShownName, k) return ok and n or k end
     if kind == "mem" then return Shown(key) end
@@ -238,6 +252,18 @@ owner:RegisterEvent("UNIT_PET")
 owner:SetScript("OnEvent", function(_, event)
     if event == "PLAYER_REGEN_ENABLED" and not pending then return end
     C_Timer.After(1, Apply)
+end)
+-- The master is whoever FTL says it is; when that changes (or its party position does), the
+-- "Master's target" keys must follow, and the secure attributes can only change out of combat.
+local appliedMaster
+local origApply = Apply
+Apply = function()
+    appliedMaster = MasterUnit()
+    return origApply()
+end
+M.Apply = Apply
+C_Timer.NewTicker(2, function()
+    if M.enabled and M.Active() and not InCombatLockdown() and MasterUnit() ~= appliedMaster then Apply() end
 end)
 M.OnEnable = function() C_Timer.After(1, Apply) end
 M.OnDisable = function() Apply() end
@@ -355,7 +381,7 @@ local function ParseTarget(text)
     local base = pet or text
     local spec
     if base:lower() == "self" then spec = "self"
-    elseif base:lower() == "target" or base:lower() == "master" then spec = "target"
+    elseif base:lower() == "target" or base:lower() == "master" then spec = "master"
     elseif IsLiteral(base) then spec = base:lower()
     else
         local want = MMT.NormKey(base)
@@ -507,7 +533,7 @@ M.Page = function(self, page)
             Apply()
         end)
         right:Cycle(("Slot %d heals"):format(i), function()
-            local t = { { text = "Yourself", value = "self" }, { text = "Master's target (assist first)", value = "target" } }
+            local t = { { text = "Yourself", value = "self" }, { text = "Master's target", value = "master" } }
             local order = MMT.SortedMembers()
             for _, k in ipairs(order) do t[#t + 1] = { text = Describe("mem:" .. k), value = "mem:" .. k } end
             for _, k in ipairs(order) do t[#t + 1] = { text = Describe("pet:" .. k), value = "pet:" .. k } end
