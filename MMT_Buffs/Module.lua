@@ -367,6 +367,21 @@ SlashCmdList.MMTBUFF = function(msg)
             MMT.Print("%s", line)
         end
         Say("%s, class %s, level %s", UnitName("player"), tostring(ClassToken()), tostring(UnitLevel("player")))
+        do   -- the Target key: whose target does it look at, and why would it pick nothing?
+            local lk = MMT.FTLLeader and MMT.FTLLeader()
+            local tu = M.TargetUnit()
+            local okf, fu = pcall(MMT.UnitForMember or function() end, lk)
+            Say("TARGET KEY: leader=%s isSelf=%s UnitForMember=%s -> looks at '%s'", tostring(lk),
+                tostring(MMT.IsSelf and lk and MMT.IsSelf(lk)), okf and tostring(fu) or ("err " .. tostring(fu)), tu)
+            Say("  exists=%s name=%s friend=%s player=%s dead=%s connected=%s", tostring(UnitExists(tu)), tostring(UnitName(tu)),
+                tostring(UnitIsFriend("player", tu)), tostring(UnitIsPlayer(tu)), tostring(UnitIsDeadOrGhost(tu)), tostring(UnitIsConnected(tu)))
+            for _, spell in ipairs(M.List()) do
+                Say("  %s: known=%s buffed=%s inRange=%s canBuff=%s", spell, tostring(Known(spell)),
+                    tostring(HasBuff(tu, spell)), tostring(InRange(spell, tu)), tostring(CanBuff(tu)))
+            end
+            local s1, u1 = M.NextTarget()
+            Say("  Target key would cast: %s", s1 and (s1 .. " on " .. tostring(UnitName(u1))) or "nothing")
+        end
         Say("self list: %s", Listing(M.SelfList()))
         for _, spell in ipairs(M.SelfList()) do
             Say("  %s: known=%s buffed=%s", spell, tostring(Known(spell)), tostring(HasBuff("player", spell)))
