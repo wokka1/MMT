@@ -4,7 +4,7 @@
 -- with the usual round-robin hotkeys:
 --
 -- * Target key (default Alt+Insert): casts the first buff from this
---   character's list that the MASTER'S TARGET is missing (read directly, no Assist Master). A mage with Arcane Intellect
+--   character's list that the TARGET is missing (ISBoxer assists the master first). A mage with Arcane Intellect
 --   needs one press, a druid with Mark of the Wild and Thorns needs two.
 -- * Group key (default Alt+Page Up): looks at you and your party members in
 --   turn and casts the first buff from the list that somebody is missing.
@@ -28,7 +28,7 @@
 -- /mmtbuff test            say what the next press of each key would cast
 
 local MMT = MMT
-local VERSION = "1.1.5"      -- keep in step with MMT_Buffs.toc; shown at the top of /mmt > Buffs
+local VERSION = "1.1.6"      -- keep in step with MMT_Buffs.toc; shown at the top of /mmt > Buffs
 
 local DEFAULT_BUFFS = {
     MAGE   = { "Arcane Intellect" },
@@ -161,19 +161,11 @@ local function GroupUnits()
     return t
 end
 
--- The unit the Target key buffs: the MASTER's target, read straight from the game
--- ("party2target"), not this character's own target. That needs no Assist Master step
--- (which raced with the buff keystroke and, as built in the ISBoxer profile, skipped the
--- very character it was aimed at). Falls back to this character's own target when there
--- is no leader, the leader is this character, or the leader isn't in the group.
-function M.TargetUnit()
-    local key = MMT.FTLLeader and MMT.FTLLeader()
-    if key and not (MMT.IsSelf and MMT.IsSelf(key)) then
-        local ok, u = pcall(MMT.UnitForMember, key)
-        if ok and type(u) == "string" and u:match("^party%d$") then return u .. "target" end
-    end
-    return "target"
-end
+-- The unit the Target key buffs: this character's own target. The ISBoxer Buff Target key assists
+-- the master first (Auto-Assist Master), which is what gives this character a target AND live
+-- buff data for it. (1.1.0-1.1.5 tried reading the master's target directly; the client only
+-- sends buff data for your own target and party, so it kept recasting. Rolled back in 1.1.6.)
+function M.TargetUnit() return "target" end
 function M.NextTarget() return Pick({ M.TargetUnit() }) end
 function M.NextGroup()
     local spell, unit = PickSelf()
@@ -243,20 +235,9 @@ local function MakeButton(name, pick)
             self:SetAttribute("type", nil)
         elseif spell then
             BLog(false, "     set type=spell spell=%s unit=%s (button now: %s/%s/%s)", spell, tostring(unit), tostring(self:GetAttribute("type")), tostring(self:GetAttribute("spell")), tostring(self:GetAttribute("unit")))
-            if unit:find("target$") and unit ~= "target" then
-                -- "party1target" etc.: cast through a macro with an @unit condition, the way the heal
-                -- keys do (proven to land on the master's target). A plain unit= attribute with a
-                -- "...target" token cast Thorns again and again without it ever arriving.
-                self:SetAttribute("type", "macro")
-                self:SetAttribute("macrotext", ("/cast [@%s,help,nodead] %s"):format(unit, spell))
-                self:SetAttribute("spell", nil)
-                self:SetAttribute("unit", nil)
-            else
-                self:SetAttribute("type", "spell")
-                self:SetAttribute("spell", spell)
-                self:SetAttribute("unit", unit)
-                self:SetAttribute("macrotext", nil)
-            end
+            self:SetAttribute("type", "spell")
+            self:SetAttribute("spell", spell)
+            self:SetAttribute("unit", unit)
             M.lastSpell, M.lastTime = spell, GetTime()
         else
             self:SetAttribute("type", nil)
