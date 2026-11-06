@@ -1,0 +1,12 @@
+## Interface: 16001
+## Title: MMT - Heal
+## Notes: MMT module: heal keys for a boxed healer. Currently only the /mmtheal check diagnostic.
+## Version: 0.1.0
+## Author: wokka1
+## X-Repository: https://github.com/wokka1/MMT
+## Dependencies: MMT
+## X-MMT-Module: 1
+## X-MMT-Title: Heal
+## IconTexture: Interface\Icons\Spell_Nature_HealingTouch
+
+Module.lua
