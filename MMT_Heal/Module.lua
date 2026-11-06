@@ -54,7 +54,8 @@ local M = MMT.NewModule({
     name = "Heal",
     title = "Heal",
     description = "Heal keys for a boxed healer: F-keys pick the unit, the modifier picks the spell.",
-    sync = false,
+    sync = true,
+    syncExclude = { "active" },          -- whether the keys are on stays per character (only the healer binds F-keys)
     defaults = { active = nil, slots = nil, spells = nil },
 })
 
@@ -241,6 +242,7 @@ end)
 M.OnEnable = function() C_Timer.After(1, Apply) end
 M.OnDisable = function() Apply() end
 M.OnProfileChanged = function() C_Timer.After(0.5, Apply) end
+M.OnSyncReceived = function() C_Timer.After(0.5, Apply) end
 
 ---------------------------------------------------------------------------
 -- Diagnostics: can health be read? (the answer on this client: no, it is secret)
