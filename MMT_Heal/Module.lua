@@ -21,7 +21,7 @@
 --
 -- /mmtheal                       show keys and spells
 -- /mmtheal spell <plain|shift|ctrl|alt> <spell>   set (no spell = empty)
--- Target "target" = heal the master's target (for people outside the team): /mmtheal slot 10 target
+-- Target "target" = heal the master's target (for people outside the team): /mmtheal slot 10 target (F12 by default)
 -- /mmtheal key <slot#> <KEY> [target]             e.g. /mmtheal key 1 F1 Wokka-Zha
 -- /mmtheal slot <slot#> <target>   target = self | <team key, e.g. Wokka-Zha> | pet <team key> | party1..
 -- /mmtheal unbind <slot#>     /mmtheal add <KEY> <unit>
@@ -30,7 +30,7 @@
 
 local MMT = MMT
 
--- Targets: "self", "target" (whatever the druid has targeted; the ISBoxer F10 keys assist the
+-- Targets: "self", "target" (whatever the druid has targeted; the ISBoxer F10 and F12 keys assist the
 -- master first, so it heals the master's target, like the Buff Target key), "mem:<team key>", "pet:<team key>". Defaults follow the team order
 -- (slot 1 = F1, slot 2 = F2 ...), then each member's pet on F5-F8.
 local function DefaultSlots()
@@ -42,7 +42,7 @@ local function DefaultSlots()
         for i = 1, 4 do t[#t + 1] = { key = "F" .. i, unit = "party" .. i } end
     end
     t[#t + 1] = { key = "F9", unit = "self" }
-    t[#t + 1] = { key = "F10", unit = "target" }           -- the master's target (ISBoxer assists the master first)
+    t[#t + 1] = { key = "F12", unit = "target" }           -- the master's target (ISBoxer assists the master first)
     return t
 end
 local DEFAULT_SPELLS = { plain = "Rejuvenation", shift = "Healing Touch", ctrl = "", alt = "" }
