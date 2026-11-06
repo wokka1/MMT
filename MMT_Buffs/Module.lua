@@ -4,7 +4,7 @@
 -- with the usual round-robin hotkeys:
 --
 -- * Target key (default Alt+Insert): casts the first buff from this
---   character's list that the TARGET is missing. A mage with Arcane Intellect
+--   character's list that the MASTER'S TARGET is missing (read directly, no Assist Master). A mage with Arcane Intellect
 --   needs one press, a druid with Mark of the Wild and Thorns needs two.
 -- * Group key (default Alt+Page Up): looks at you and your party members in
 --   turn and casts the first buff from the list that somebody is missing.
@@ -160,7 +160,20 @@ local function GroupUnits()
     return t
 end
 
-function M.NextTarget() return Pick({ "target" }) end
+-- The unit the Target key buffs: the MASTER's target, read straight from the game
+-- ("party2target"), not this character's own target. That needs no Assist Master step
+-- (which raced with the buff keystroke and, as built in the ISBoxer profile, skipped the
+-- very character it was aimed at). Falls back to this character's own target when there
+-- is no leader, the leader is this character, or the leader isn't in the group.
+function M.TargetUnit()
+    local key = MMT.FTLLeader and MMT.FTLLeader()
+    if key and not (MMT.IsSelf and MMT.IsSelf(key)) then
+        local ok, u = pcall(MMT.UnitForMember, key)
+        if ok and type(u) == "string" and u:match("^party%d$") then return u .. "target" end
+    end
+    return "target"
+end
+function M.NextTarget() return Pick({ M.TargetUnit() }) end
 function M.NextGroup()
     local spell, unit = PickSelf()
     if spell then return spell, unit end
@@ -197,7 +210,7 @@ local function MakeButton(name, pick)
         BLog(false, "  -> %s", spell and (spell .. " on " .. tostring(UnitName(unit))) or "nothing to do")
         if M.db and M.db.debug then
             -- why: state of the unit this key looks at, and the buffs it can see on it
-            local u = (name == "MMTBuffTarget") and "target" or (unit or "player")
+            local u = (name == "MMTBuffTarget") and M.TargetUnit() or (unit or "player")
             local auras = {}
             pcall(function()
                 for i = 1, 40 do
