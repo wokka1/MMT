@@ -286,6 +286,66 @@ f:SetScript("OnEvent", function()
 end)
 
 ---------------------------------------------------------------------------
+-- Trace: why does Assist Master sometimes leave the old target?  (/mmtheal trace)
+-- Logs, with timestamps, to MMTDB.healLog (written on /reload or logout):
+--   * every change of this character's target,
+--   * every change of the leader's target as THIS client sees it (UNIT_TARGET),
+--   * every press of a heal key (what is targeted here vs. what the leader targets),
+--   * the macros/bindings that matter (FTL Assist text, what Backspace is bound to).
+---------------------------------------------------------------------------
+local tracing = false
+local function TName(unit)
+    if not UnitExists(unit) then return "none" end
+    local n = UnitName(unit)
+    return Show(n) .. (UnitIsPlayer(unit) and "(P)" or "") .. (UnitIsFriend("player", unit) and "(F)" or "(E)")
+end
+local function LeaderUnit()
+    local key = MMT.FTLLeader and MMT.FTLLeader()
+    if not key then return nil, nil end
+    if MMT.IsSelf and MMT.IsSelf(key) then return "player", key end
+    return UnitOfMember(key), key
+end
+local function TraceLine(what)
+    local lu, lk = LeaderUnit()
+    Log("%s | me.target=%s focus=%s | leader=%s unit=%s leader.target=%s", what, TName("target"), TName("focus"),
+        tostring(lk), tostring(lu), lu and TName(lu .. "target") or "n/a")
+end
+local tf = CreateFrame("Frame")
+tf:RegisterEvent("PLAYER_TARGET_CHANGED")
+tf:RegisterEvent("UNIT_TARGET")
+tf:RegisterEvent("PLAYER_FOCUS_CHANGED")
+tf:SetScript("OnEvent", function(_, event, unit)
+    if not (tracing and M.enabled) then return end
+    local lu = LeaderUnit()
+    if event == "UNIT_TARGET" and unit ~= lu then return end
+    TraceLine(event == "UNIT_TARGET" and "LEADER-TARGET-CHANGED" or event)
+end)
+local function HookButtons()
+    for i = 1, MAXSLOTS do
+        local b = Button(i)
+        if not b.mmtTrace then
+            b.mmtTrace = true
+            b:HookScript("PreClick", function(self, _, down)
+                if tracing and down then TraceLine("HEAL-KEY slot" .. i .. " -> " .. tostring(resolved[i])) end
+            end)
+        end
+    end
+end
+local function TraceInfo()
+    Log("== trace info  leader=%s", tostring(MMT.FTLLeader and MMT.FTLLeader()))
+    for _, k in ipairs({ "BACKSPACE", "SHIFT-BACKSPACE", "CTRL-BACKSPACE", "ALT-BACKSPACE", "F10", "F12" }) do
+        Log("binding %s -> %s", k, tostring(GetBindingAction(k, true)))
+    end
+    for i = 1, 140 do
+        local name, _, body = GetMacroInfo(i)
+        if name and (name:find("FTL") or name:find("ISB")) then
+            Log("macro %d %s: %s", i, name, (tostring(body):gsub("\n", " / ")))
+        end
+    end
+    TraceLine("now")
+end
+
+---------------------------------------------------------------------------
 -- Slash command
 ---------------------------------------------------------------------------
 -- "self" | "party2" | "Wokka-Zha" | "pet Wokka-Zha" -> stored spec
@@ -324,6 +384,10 @@ SlashCmdList.MMTHEAL = function(msg)
     local cmd, rest = Trim(msg):match("^(%S*)%s*(.-)$")
     cmd = cmd:lower()
     if cmd == "check" then Check("manual")
+    elseif cmd == "trace" then
+        tracing = not tracing
+        if tracing then HookButtons() TraceInfo() end
+        MMT.Print("Heal trace is %s. Reproduce the problem, then /reload to write the log.", tracing and "ON" or "off")
     elseif cmd == "combat" then armed = true MMT.Print("armed: the check runs at the start of the next fight.")
     elseif cmd == "clear" then if MMTDB then MMTDB.healLog = {} end MMT.Print("log cleared.")
     elseif cmd == "spell" then
