@@ -379,6 +379,24 @@ SlashCmdList.MMTBUFF = function(msg)
                 Say("  %s: known=%s buffed=%s inRange=%s canBuff=%s", spell, tostring(Known(spell)),
                     tostring(HasBuff(tu, spell)), tostring(InRange(spell, tu)), tostring(CanBuff(tu)))
             end
+            local function AuraNames(u)
+                local names = {}
+                pcall(function()
+                    for i = 1, 40 do
+                        local a = C_UnitAuras.GetAuraDataByIndex(u, i, "HELPFUL")
+                        if not a then break end
+                        names[#names + 1] = tostring(a.name) .. "#" .. tostring(a.spellId) .. (a.sourceUnit and "" or "")
+                    end
+                end)
+                return table.concat(names, ", ")
+            end
+            for _, u in ipairs({ "player", "party1", "party2", "party3", tu }) do
+                if UnitExists(u) then Say("  AURAS on %s (%s): %s", u, tostring(UnitName(u)), AuraNames(u)) end
+            end
+            for _, spell in ipairs(M.List()) do
+                local okI, info = pcall(C_Spell.GetSpellInfo, spell)
+                Say("  spell '%s' -> name=%s id=%s", spell, okI and info and tostring(info.name) or "?", okI and info and tostring(info.spellID) or "?")
+            end
             local s1, u1 = M.NextTarget()
             Say("  Target key would cast: %s", s1 and (s1 .. " on " .. tostring(UnitName(u1))) or "nothing")
         end
