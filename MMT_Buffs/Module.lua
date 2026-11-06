@@ -28,7 +28,7 @@
 -- /mmtbuff test            say what the next press of each key would cast
 
 local MMT = MMT
-local VERSION = "1.1.3"      -- keep in step with MMT_Buffs.toc; shown at the top of /mmt > Buffs
+local VERSION = "1.1.4"      -- keep in step with MMT_Buffs.toc; shown at the top of /mmt > Buffs
 
 local DEFAULT_BUFFS = {
     MAGE   = { "Arcane Intellect" },
@@ -424,6 +424,7 @@ SlashCmdList.MMTBUFF = function(msg)
         s, u = M.NextGroup()
         MMT.Print("Group key would cast: %s", s and (s .. " on " .. UnitName(u)) or "nothing")
     else
+        MMT.Print("MMT_Buffs version %s", VERSION)
         MMT.Print("Buffs (%s): %s", ClassToken() or "?", #M.List() > 0 and table.concat(M.List(), ", ") or "(nothing for this class)")
         MMT.Print("Self buffs (%s): %s", ClassToken() or "?", Listing(M.SelfList()))
         MMT.Print("Keys: target %s, group %s. /mmtbuff add|remove <spell>, addself|removeself <spell>, reset, resetself, test", M.db.keyTarget, M.db.keyGroup)
