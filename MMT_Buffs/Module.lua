@@ -28,6 +28,7 @@
 -- /mmtbuff test            say what the next press of each key would cast
 
 local MMT = MMT
+local VERSION = "1.1.3"      -- keep in step with MMT_Buffs.toc; shown at the top of /mmt > Buffs
 
 local DEFAULT_BUFFS = {
     MAGE   = { "Arcane Intellect" },
@@ -366,6 +367,7 @@ SlashCmdList.MMTBUFF = function(msg)
             out[#out + 1] = line
             MMT.Print("%s", line)
         end
+        Say("MMT_Buffs code version %s", VERSION)
         Say("%s, class %s, level %s", UnitName("player"), tostring(ClassToken()), tostring(UnitLevel("player")))
         do   -- the Target key: whose target does it look at, and why would it pick nothing?
             local lk = MMT.FTLLeader and MMT.FTLLeader()
@@ -434,6 +436,7 @@ end
 M.Page = function(self, page)
     local UI = MMT.UI
     local col = UI.Column(page, 0, 0, MMT.ConfigHelpers.COL_W)
+    col:Header("Buffs  -  version " .. VERSION)
     col:Header("Keys")
     col:Add(UI.EditBox(page, col.width, "Target key (e.g. ALT-INSERT; empty = none)", function(text, box)
         M.db.keyTarget = Trim(text):upper(); ApplyKeys(); box:ClearFocus()

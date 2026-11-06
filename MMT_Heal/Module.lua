@@ -31,6 +31,7 @@
 -- /mmtheal check | combat | clear   (diagnostics: can health be read?)
 
 local MMT = MMT
+local VERSION = "0.5.1"      -- keep in step with MMT_Heal.toc; shown at the top of /mmt > Heal
 
 -- Targets: "self", "master" (the leader's target, via @partyNtarget), "mem:<team key>", "pet:<team key>". Defaults follow the team order
 -- (slot 1 = F1, slot 2 = F2 ...), then each member's pet on F5-F8.
@@ -394,6 +395,7 @@ local function ParseTarget(text)
 end
 
 local function Status()
+    MMT.Print("MMT_Heal version %s", VERSION)
     MMT.Print("Heal is %s (%s).", M.Active() and "ACTIVE" or "inactive on this character (/mmtheal on)", Class() or "?")
     local sp = M.Spells()
     for _, p in ipairs(PRESS) do
@@ -471,6 +473,7 @@ end
 M.Page = function(self, page)
     local UI = MMT.UI
     local col = UI.Column(page, 0, 0, MMT.ConfigHelpers.COL_W)
+    col:Header("Heal  -  version " .. VERSION)
     col:Header("Active on this character")
     col:Check("Heal keys on (default: only on healer classes)", function() return M.Active() end,
         function(v) M.db.active = v and true or false; Apply() end)
