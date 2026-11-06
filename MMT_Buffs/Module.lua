@@ -28,7 +28,7 @@
 -- /mmtbuff test            say what the next press of each key would cast
 
 local MMT = MMT
-local VERSION = "1.1.4"      -- keep in step with MMT_Buffs.toc; shown at the top of /mmt > Buffs
+local VERSION = "1.1.5"      -- keep in step with MMT_Buffs.toc; shown at the top of /mmt > Buffs
 
 local DEFAULT_BUFFS = {
     MAGE   = { "Arcane Intellect" },
@@ -243,9 +243,20 @@ local function MakeButton(name, pick)
             self:SetAttribute("type", nil)
         elseif spell then
             BLog(false, "     set type=spell spell=%s unit=%s (button now: %s/%s/%s)", spell, tostring(unit), tostring(self:GetAttribute("type")), tostring(self:GetAttribute("spell")), tostring(self:GetAttribute("unit")))
-            self:SetAttribute("type", "spell")
-            self:SetAttribute("spell", spell)
-            self:SetAttribute("unit", unit)
+            if unit:find("target$") and unit ~= "target" then
+                -- "party1target" etc.: cast through a macro with an @unit condition, the way the heal
+                -- keys do (proven to land on the master's target). A plain unit= attribute with a
+                -- "...target" token cast Thorns again and again without it ever arriving.
+                self:SetAttribute("type", "macro")
+                self:SetAttribute("macrotext", ("/cast [@%s,help,nodead] %s"):format(unit, spell))
+                self:SetAttribute("spell", nil)
+                self:SetAttribute("unit", nil)
+            else
+                self:SetAttribute("type", "spell")
+                self:SetAttribute("spell", spell)
+                self:SetAttribute("unit", unit)
+                self:SetAttribute("macrotext", nil)
+            end
             M.lastSpell, M.lastTime = spell, GetTime()
         else
             self:SetAttribute("type", nil)
