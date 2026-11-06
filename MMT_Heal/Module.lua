@@ -51,6 +51,22 @@ local function Check(tag)
             local okH, h = pcall(UnitHealth, u)
             local okM, m = pcall(UnitHealthMax, u)
             local okF, pct = pcall(function() return UnitHealth(u) / UnitHealthMax(u) end)
+            for _, fn in ipairs({ "UnitHealthPercent", "UnitHealthMissing", "UnitHealthMissingPercent", "UnitGetTotalAbsorbs" }) do
+                if _G[fn] then
+                    local ok, r = pcall(_G[fn], u)
+                    Log("  %s(%s) = %s", fn, u, ok and Show(r) or ("err " .. tostring(r)))
+                else
+                    Log("  %s does not exist", fn)
+                end
+            end
+            if C_CurveUtil and C_CurveUtil.CreateCurve and UnitHealthPercent then
+                local ok, r = pcall(function()
+                    local c = C_CurveUtil.CreateCurve()
+                    c:AddPoint(0, 0) c:AddPoint(0.5, 1) c:AddPoint(1, 2)
+                    return UnitHealthPercent(u, false, c)
+                end)
+                Log("  UnitHealthPercent(curve) = %s", ok and Show(r) or ("err " .. tostring(r)))
+            end
             Log("%s %s hp=%s max=%s ratio=%s", u, Show(UnitName(u)), okH and Show(h) or "err",
                 okM and Show(m) or "err", okF and Show(pct) or "ERR(arith)")
         end
