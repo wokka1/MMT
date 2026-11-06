@@ -21,6 +21,7 @@
 --
 -- /mmtheal                       show keys and spells
 -- /mmtheal spell <plain|shift|ctrl|alt> <spell>   set (no spell = empty)
+-- Target "target" = heal the master's target (for people outside the team): /mmtheal slot 10 target
 -- /mmtheal key <slot#> <KEY> [target]             e.g. /mmtheal key 1 F1 Wokka-Zha
 -- /mmtheal slot <slot#> <target>   target = self | <team key, e.g. Wokka-Zha> | pet <team key> | party1..
 -- /mmtheal unbind <slot#>     /mmtheal add <KEY> <unit>
@@ -29,7 +30,8 @@
 
 local MMT = MMT
 
--- Targets: "self", "mem:<team key>", "pet:<team key>". Defaults follow the team order
+-- Targets: "self", "target" (whatever the druid has targeted; the ISBoxer F10 keys assist the
+-- master first, so it heals the master's target, like the Buff Target key), "mem:<team key>", "pet:<team key>". Defaults follow the team order
 -- (slot 1 = F1, slot 2 = F2 ...), then each member's pet on F5-F8.
 local function DefaultSlots()
     local t = {}
@@ -39,6 +41,8 @@ local function DefaultSlots()
     if #t == 0 then
         for i = 1, 4 do t[#t + 1] = { key = "F" .. i, unit = "party" .. i } end
     end
+    t[#t + 1] = { key = "F9", unit = "self" }
+    t[#t + 1] = { key = "F10", unit = "target" }           -- the master's target (ISBoxer assists the master first)
     return t
 end
 local DEFAULT_SPELLS = { plain = "Rejuvenation", shift = "Healing Touch", ctrl = "", alt = "" }
@@ -141,6 +145,7 @@ local function Describe(spec)
     spec = Trim(spec)
     local l = spec:lower()
     if l == "self" or l == "player" then return "Yourself" end
+    if l == "target" then return "Master's target (assist first)" end
     local kind, key = spec:match("^(%a+):(.+)$")
     local function Shown(k) local ok, n = pcall(MMT.ShownName, k) return ok and n or k end
     if kind == "mem" then return Shown(key) end
@@ -288,6 +293,7 @@ local function ParseTarget(text)
     local base = pet or text
     local spec
     if base:lower() == "self" then spec = "self"
+    elseif base:lower() == "target" or base:lower() == "master" then spec = "target"
     elseif IsLiteral(base) then spec = base:lower()
     else
         local want = MMT.NormKey(base)
@@ -435,7 +441,7 @@ M.Page = function(self, page)
             Apply()
         end)
         right:Cycle(("Slot %d heals"):format(i), function()
-            local t = { { text = "Yourself", value = "self" } }
+            local t = { { text = "Yourself", value = "self" }, { text = "Master's target (assist first)", value = "target" } }
             local order = MMT.SortedMembers()
             for _, k in ipairs(order) do t[#t + 1] = { text = Describe("mem:" .. k), value = "mem:" .. k } end
             for _, k in ipairs(order) do t[#t + 1] = { text = Describe("pet:" .. k), value = "pet:" .. k } end
