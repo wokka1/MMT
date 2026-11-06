@@ -412,7 +412,9 @@ M.Page = function(self, page)
         end)
     end
     col:Note("Any other spell: /mmtheal spell <plain|shift|ctrl|alt> <name>.")
+    local right = UI.Column(page, MMT.ConfigHelpers.COL2_X, col.y, MMT.ConfigHelpers.COL_W)
     col:Header("Key for each slot")
+    right:Header("Who that key heals")
     local KEYS = {}
     for i = 1, 12 do KEYS[#KEYS + 1] = "F" .. i end
     local NSLOT = 12
@@ -432,10 +434,6 @@ M.Page = function(self, page)
             end)
             Apply()
         end)
-    end
-    local right = UI.Column(page, MMT.ConfigHelpers.COL2_X, 0, MMT.ConfigHelpers.COL_W)
-    right:Header("Who each slot heals")
-    for i = 1, NSLOT do
         right:Cycle(("Slot %d heals"):format(i), function()
             local t = { { text = "Yourself", value = "self" } }
             local order = MMT.SortedMembers()

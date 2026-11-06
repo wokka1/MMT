@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: MMT - Heal
 ## Notes: MMT module: heal keys for a boxed healer. F-keys pick the unit, Shift/Ctrl/Alt pick the spell, all configurable. Works in combat.
-## Version: 0.3.0
+## Version: 0.3.1
 ## Author: wokka1
 ## X-Repository: https://github.com/wokka1/MMT
 ## Dependencies: MMT
