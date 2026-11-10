@@ -31,7 +31,7 @@
 -- /mmtheal check | combat | clear   (diagnostics: can health be read?)
 
 local MMT = MMT
-local VERSION = "0.5.1"      -- keep in step with MMT_Heal.toc; shown at the top of /mmt > Heal
+local VERSION = "0.6.0"      -- keep in step with MMT_Heal.toc; shown at the top of /mmt > Heal
 
 -- Targets: "self", "master" (the leader's target, via @partyNtarget), "mem:<team key>", "pet:<team key>". Defaults follow the team order
 -- (slot 1 = F1, slot 2 = F2 ...), then each member's pet on F5-F8.
@@ -188,15 +188,22 @@ end
 ---------------------------------------------------------------------------
 -- Secure buttons: one per slot, configured out of combat
 ---------------------------------------------------------------------------
+-- One button per slot AND per press kind (MMTHeal<i> plain, <i>S shift, <i>C ctrl, <i>A alt). The kind is decided
+-- by which binding fired (SHIFT-F2 etc., chosen by the game from the key message), NOT by the modifier state at click
+-- time: a "shift-" attribute prefix on one shared button needs IsShiftKeyDown() to be true, and keys sent by ISBoxer to
+-- a background window don't set it, so Shift+F fell through to the plain spell (found 2026-11-10).
 local buttons = {}
-local function Button(i)
-    if not buttons[i] then
-        local b = CreateFrame("Button", "MMTHeal" .. i, UIParent, "SecureActionButtonTemplate")
+local KIND_SUFFIX = { plain = "", shift = "S", ctrl = "C", alt = "A" }
+local function Button(i, kind)
+    kind = kind or "plain"
+    local name = "MMTHeal" .. i .. KIND_SUFFIX[kind]
+    if not buttons[name] then
+        local b = CreateFrame("Button", name, UIParent, "SecureActionButtonTemplate")
         b:RegisterForClicks("AnyDown", "AnyUp")
-        buttons[i] = b
-        _G["BINDING_NAME_CLICK MMTHeal" .. i .. ":LeftButton"] = "Heal slot " .. i
+        buttons[name] = b
+        _G["BINDING_NAME_CLICK " .. name .. ":LeftButton"] = "Heal slot " .. i .. (kind ~= "plain" and (" " .. kind) or "")
     end
-    return buttons[i]
+    return buttons[name]
 end
 
 local owner = CreateFrame("Frame")
@@ -211,32 +218,35 @@ local function Apply()
     wipe(resolved)
     local slots = M.Slots()
     for i = 1, MAXSLOTS do
-        local b = Button(i)
         for _, p in ipairs(PRESS) do
-            b:SetAttribute(p[2] .. "type1", nil)
-            b:SetAttribute(p[2] .. "macrotext1", nil)
+            local kb = Button(i, p[1])
+            kb:SetAttribute("type1", nil)
+            kb:SetAttribute("macrotext1", nil)
+            for _, q in ipairs(PRESS) do                          -- clear the old shared-button prefixed attributes
+                kb:SetAttribute(q[2] .. "type1", nil)
+                kb:SetAttribute(q[2] .. "macrotext1", nil)
+            end
         end
-        b:SetAttribute("type1", nil)
         local s = slots[i]
         if M.enabled and M.Active() and s and s.key and s.key ~= "" then
             local unit = Resolve(s.unit)
             resolved[i] = unit
             if unit then
                 local spells = M.Spells()
+                local key = s.key:upper()
                 for _, p in ipairs(PRESS) do
                     local sp = Trim(spells[p[1]])
-                    if sp == "" then
-                        b:SetAttribute(p[2] .. "type1", "")          -- "" (not nil): no fallback to the plain press
-                    else
-                        b:SetAttribute(p[2] .. "type1", "macro")
-                        b:SetAttribute(p[2] .. "macrotext1", ("/cast [@%s,help,nodead] %s"):format(unit, sp))
-                    end
-                end
-                local key = s.key:upper()
-                SetOverrideBindingClick(owner, true, key, "MMTHeal" .. i, "LeftButton")
-                for _, p in ipairs(PRESS) do
-                    if p[2] ~= "" and Trim(spells[p[1]]) ~= "" and not key:find("-", 1, true) then
-                        SetOverrideBindingClick(owner, true, p[2]:upper() .. key, "MMTHeal" .. i, "LeftButton")
+                    if sp ~= "" then
+                        local kb = Button(i, p[1])
+                        kb:SetAttribute("type1", "macro")
+                        kb:SetAttribute("macrotext1", ("/cast [@%s,help,nodead] %s"):format(unit, sp))
+                        if p[1] == "plain" then
+                            SetOverrideBindingClick(owner, true, key, kb:GetName(), "LeftButton")
+                        elseif not key:find("-", 1, true) then
+                            SetOverrideBindingClick(owner, true, p[2]:upper() .. key, kb:GetName(), "LeftButton")
+                        end
+                    elseif p[1] == "plain" then
+                        -- nothing to cast on a plain press: leave the key alone, as before
                     end
                 end
             end
@@ -349,12 +359,14 @@ tf:SetScript("OnEvent", function(_, event, unit)
 end)
 local function HookButtons()
     for i = 1, MAXSLOTS do
-        local b = Button(i)
-        if not b.mmtTrace then
-            b.mmtTrace = true
-            b:HookScript("PreClick", function(self, _, down)
-                if tracing and down then TraceLine("HEAL-KEY slot" .. i .. " -> " .. tostring(resolved[i])) end
-            end)
+        for _, p in ipairs(PRESS) do
+            local b = Button(i, p[1])
+            if not b.mmtTrace then
+                b.mmtTrace = true
+                b:HookScript("PreClick", function(self, _, down)
+                    if tracing and down then TraceLine("HEAL-KEY slot" .. i .. " " .. p[1] .. " -> " .. tostring(resolved[i])) end
+                end)
+            end
         end
     end
 end
@@ -460,9 +472,9 @@ SlashCmdList.MMTHEAL = function(msg)
     elseif cmd == "off" then M.db.active = false Apply() Status()
     elseif cmd == "test" then
         for i, s in ipairs(M.Slots()) do
-            local b = Button(i)
-            MMT.Print("slot %d %s -> %s: plain=[%s] shift=[%s] ctrl=[%s]", i, s.key, tostring(resolved[i]),
-                tostring(b:GetAttribute("macrotext1")), tostring(b:GetAttribute("shift-macrotext1")), tostring(b:GetAttribute("ctrl-macrotext1")))
+            MMT.Print("slot %d %s -> %s: plain=[%s] shift=[%s] ctrl=[%s] alt=[%s]", i, s.key, tostring(resolved[i]),
+                tostring(Button(i, "plain"):GetAttribute("macrotext1")), tostring(Button(i, "shift"):GetAttribute("macrotext1")),
+                tostring(Button(i, "ctrl"):GetAttribute("macrotext1")), tostring(Button(i, "alt"):GetAttribute("macrotext1")))
         end
     else Status() end
 end
