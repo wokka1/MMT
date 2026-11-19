@@ -1,4 +1,5 @@
 -- MMT: at a vendor: repair, sell grey items and the items of the sell list,
+-- the items marked Junk in WMA (optional),
 -- never the items of the never-sell list, and buy the items of the buy list
 -- up to their count (Trade / Mail / Vendor page).
 --
@@ -30,6 +31,7 @@ local function ToSell(info)
     local never = ListRole(m.neverRole)
     if never and ns.RoleWantsItem(never, link) then return false end
     if m.sellGrey and info.quality == POOR then return true end
+    if m.sellWmaJunk and WMA and WMA.IsMarkedJunk and WMA:IsMarkedJunk(info.itemID) then return true end
     local sell = ListRole(m.sellRole)
     return sell ~= nil and ns.RoleWantsItem(sell, link)
 end
@@ -180,7 +182,7 @@ ns.On("MERCHANT_SHOW", function()
     merchantOpen = true
     local m = ns.db.merchant
     if m.repair then Repair() end
-    if m.sellGrey or ListRole(m.sellRole) then SellGrey() end
+    if m.sellGrey or m.sellWmaJunk or ListRole(m.sellRole) then SellGrey() end
     if m.buy then C_Timer.After(0.5, function() if merchantOpen then BuyList() end end) end
 end)
 
