@@ -122,7 +122,6 @@ ns.defaults = {
     -- profiles is copied over by the module once)
     gossip   = { vendor = true, taxi = true, dialog = true },
     merchant = { sellGrey = true, repair = true, guildRepair = false, report = true, tellLeader = true, moneyFormat = "text",
-                 sellWmaJunk = false,                      -- also sell items you marked Junk in WMA (Alt+right-click in bags)
                  sellRole = "", neverRole = "",          -- sell list / never-sell list (role names)
                  buy = false, buyList = {} },            -- buy list: { itemID, name, count, who }
     mail     = { enabled = true, goldTo = "", keepGold = 100 },     -- mailbox button: role items to the team, gold above keepGold
