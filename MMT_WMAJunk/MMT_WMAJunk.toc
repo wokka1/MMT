@@ -1,0 +1,15 @@
+## Interface: 16001
+## Title: MMT - WMA Junk Seller
+## Notes: MMT module: at a vendor, sells the items you marked Junk in WMA (Alt+right-click in your bags). Needs the WMA addon.
+## Version: 1.0.0
+## Author: wokka1
+## X-Repository: https://github.com/wokka1/MMT
+## Dependencies: MMT
+## OptionalDeps: WMA
+## DefaultState: disabled
+## X-MMT-DefaultState: disabled
+## X-MMT-Module: 1
+## X-MMT-Title: WMA Junk Seller
+## IconTexture: Interface\Icons\INV_Misc_Coin_01
+
+Module.lua
