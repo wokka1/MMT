@@ -9,7 +9,7 @@
 --   plain press   Rejuvenation        (cheap HoT, top-up)
 --   Shift         Healing Touch       (the big heal)
 --   Ctrl          Regrowth            (skipped when not learned or left empty)
---   Alt           empty
+--   Ctrl+Shift    empty
 -- Spells are cast by name (highest rank known). Everything is plain secure
 -- attributes, so it works IN COMBAT. The price: no aura logic in combat (Rejuvenation
 -- is simply recast, which refreshes it).
@@ -20,7 +20,7 @@
 -- whenever the group changes (out of combat) and the key keeps following the character.
 --
 -- /mmtheal                       show keys and spells
--- /mmtheal spell <plain|shift|ctrl|alt> <spell>   set (no spell = empty)
+-- /mmtheal spell <plain|shift|ctrl|cshift> <spell>   set (no spell = empty)
 -- Target "master" = the master's (leader's) target, read straight from the game (partyNtarget), so no
 -- Assist Master step is needed and nothing races: /mmtheal slot 12 master (F12 by default).
 -- ("target" is accepted as an old name for it.)
@@ -47,8 +47,8 @@ local function DefaultSlots()
     t[#t + 1] = { key = "F12", unit = "master" }
     return t
 end
-local DEFAULT_SPELLS = { plain = "Rejuvenation", shift = "Healing Touch", ctrl = "", alt = "" }
-local PRESS = { { "plain", "" }, { "shift", "shift-" }, { "ctrl", "ctrl-" }, { "alt", "alt-" } }
+local DEFAULT_SPELLS = { plain = "Rejuvenation", shift = "Healing Touch", ctrl = "", cshift = "" }
+local PRESS = { { "plain", "" }, { "shift", "shift-" }, { "ctrl", "ctrl-" }, { "cshift", "ctrl-shift-" } }
 local HEALERS = { DRUID = true, PRIEST = true, PALADIN = true, SHAMAN = true }
 local MAXSLOTS = 16
 
@@ -81,6 +81,7 @@ function M.Spells()
     for k, v in pairs(DEFAULT_SPELLS) do t[k] = v end
     if M.db and M.db.spells then
         for k, v in pairs(M.db.spells) do t[k] = v end
+        if M.db.spells.cshift == nil and M.db.spells.alt ~= nil then t.cshift = M.db.spells.alt end   -- the old Alt kind became Ctrl+Shift
     end
     return t
 end
@@ -188,12 +189,12 @@ end
 ---------------------------------------------------------------------------
 -- Secure buttons: one per slot, configured out of combat
 ---------------------------------------------------------------------------
--- One button per slot AND per press kind (MMTHeal<i> plain, <i>S shift, <i>C ctrl, <i>A alt). The kind is decided
+-- One button per slot AND per press kind (MMTHeal<i> plain, <i>S shift, <i>C ctrl, <i>X ctrl+shift). The kind is decided
 -- by which binding fired (SHIFT-F2 etc., chosen by the game from the key message), NOT by the modifier state at click
 -- time: a "shift-" attribute prefix on one shared button needs IsShiftKeyDown() to be true, and keys sent by ISBoxer to
 -- a background window don't set it, so Shift+F fell through to the plain spell (found 2026-11-10).
 local buttons = {}
-local KIND_SUFFIX = { plain = "", shift = "S", ctrl = "C", alt = "A" }
+local KIND_SUFFIX = { plain = "", shift = "S", ctrl = "C", cshift = "X" }
 local function Button(i, kind)
     kind = kind or "plain"
     local name = "MMTHeal" .. i .. KIND_SUFFIX[kind]
@@ -433,7 +434,7 @@ SlashCmdList.MMTHEAL = function(msg)
     elseif cmd == "spell" then
         local kind, sp = rest:match("^(%S+)%s*(.-)$")
         kind = kind and kind:lower()
-        if not (kind and DEFAULT_SPELLS[kind]) then MMT.Print("/mmtheal spell <plain|shift|ctrl|alt> <spell name, empty to clear>") return end
+        if not (kind and DEFAULT_SPELLS[kind]) then MMT.Print("/mmtheal spell <plain|shift|ctrl|cshift> <spell name, empty to clear>") return end
         M.db.spells = M.db.spells or {}
         M.db.spells[kind] = Trim(sp)
         Apply() Status()
@@ -472,9 +473,9 @@ SlashCmdList.MMTHEAL = function(msg)
     elseif cmd == "off" then M.db.active = false Apply() Status()
     elseif cmd == "test" then
         for i, s in ipairs(M.Slots()) do
-            MMT.Print("slot %d %s -> %s: plain=[%s] shift=[%s] ctrl=[%s] alt=[%s]", i, s.key, tostring(resolved[i]),
+            MMT.Print("slot %d %s -> %s: plain=[%s] shift=[%s] ctrl=[%s] cshift=[%s]", i, s.key, tostring(resolved[i]),
                 tostring(Button(i, "plain"):GetAttribute("macrotext1")), tostring(Button(i, "shift"):GetAttribute("macrotext1")),
-                tostring(Button(i, "ctrl"):GetAttribute("macrotext1")), tostring(Button(i, "alt"):GetAttribute("macrotext1")))
+                tostring(Button(i, "ctrl"):GetAttribute("macrotext1")), tostring(Button(i, "cshift"):GetAttribute("macrotext1")))
         end
     else Status() end
 end
@@ -504,7 +505,7 @@ M.Page = function(self, page)
         plain = "Plain press (F-key alone) casts",
         shift = "Shift + F-key casts",
         ctrl  = "Ctrl + F-key casts",
-        alt   = "Alt + F-key casts",
+        cshift = "Ctrl+Shift + F-key casts",
     }
     for _, p in ipairs(PRESS) do
         col:Cycle(CAPTION[p[1]], function()
@@ -524,7 +525,7 @@ M.Page = function(self, page)
             Apply()
         end)
     end
-    col:Note("Any other spell: /mmtheal spell <plain|shift|ctrl|alt> <name>.")
+    col:Note("Any other spell: /mmtheal spell <plain|shift|ctrl|cshift> <name>.")
     local right = UI.Column(page, MMT.ConfigHelpers.COL2_X, col.y, MMT.ConfigHelpers.COL_W)
     col:Header("Key for each slot")
     right:Header("Who that key heals")
@@ -569,5 +570,5 @@ M.Page = function(self, page)
             Apply()
         end)
     end
-    col:Note("The game hides health from addons, so the module can't pick who needs healing: you choose with the key, and the press kind (plain / Shift / Ctrl / Alt) picks the spell. Works in combat. Each key follows the character (or that character's pet) you pick, wherever it sits in the party. Also /mmtheal.")
+    col:Note("The game hides health from addons, so the module can't pick who needs healing: you choose with the key, and the press kind (plain / Shift / Ctrl / Ctrl+Shift) picks the spell. Works in combat. Each key follows the character (or that character's pet) you pick, wherever it sits in the party. Also /mmtheal.")
 end
